@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+## 構成
 
-## Getting Started
+### app
+NextJS Approuter構成
 
-First, run the development server:
+### nest-app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NestJSのコードをamplifyディレクトリ配下におくと、ホットデプロイ時に以下のエラー発生したのでディレクトリ外に配置
+
+```
+npx amplify sandbox
+amplify/custom/functions/test/src/app.controller.ts(4,2): error TS1238: Unable to resolve signature of class decorator when called as an expression.
+  The runtime will invoke the decorator with 2 arguments, but the decorator expects 1.
+amplify/custom/functions/test/src/app.controller.ts(8,3): error TS1241: Unable to resolve signature of method decorator when called as an expression.
+  The runtime will invoke the decorator with 2 arguments, but the decorator expects 3.
+amplify/custom/functions/test/src/app.controller.ts(8,4): error TS1270: Decorator function return type 'void | TypedPropertyDescriptor<unknown>' is not assignable to type 'void | (() => string)'.
+  Type 'TypedPropertyDescriptor<unknown>' is not assignable to type 'void | (() => string)'.
+amplify/custom/functions/test/src/app.module.ts(5,2): error TS1238: Unable to resolve signature of class decorator when called as an expression.
+  The runtime will invoke the decorator with 2 arguments, but the decorator expects 1.
+amplify/custom/functions/test/src/app.service.ts(3,2): error TS1238: Unable to resolve signature of class decorator when called as an expression.
+  The runtime will invoke the decorator with 2 arguments, but the decorator expects 1.
+TypeScript validation check failed, check your backend definition
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### amplify
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`amplify/custom/functions/resouces.ts`内で以下のように定義
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+```
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { Construct } from "constructs";
+import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import { Duration } from "aws-cdk-lib";
+import * as path from "path";
+import { fileURLToPath } from "url";
 
-## Learn More
+export class CustomFunction extends Construct {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
 
-To learn more about Next.js, take a look at the following resources:
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    const handler = new lambda.DockerImageFunction(this, "Handler", {
+      code: lambda.DockerImageCode.fromImageAsset(
+        path.join(__dirname, "../../../nest-app"),
+        {
+          file: "Dockerfile",
+          platform: Platform.LINUX_AMD64,
+        }
+      ),
+      timeout: Duration.seconds(30),
+    });
+  }
+}
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": ".",
+  "compilerOptions": {
+    "deleteOutDir": true
+  },
+  "monorepo": true,
+  "root": ".",
+  "projects": {
+    "ses": {
+      "type": "library",
+      "root": "libs/ses",
+      "entryFile": "index",
+      "sourceRoot": "libs/ses/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/ses/tsconfig.lib.json"
+      }
+    },
+    "cognito": {
+      "type": "library",
+      "root": "libs/cognito",
+      "entryFile": "index",
+      "sourceRoot": "libs/cognito/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/cognito/tsconfig.lib.json"
+      }
+    },
+    "cognito-custom-message-trigger": {
+      "type": "application",
+      "root": "apps/cognito-custom-message-trigger",
+      "entryFile": "main",
+      "sourceRoot": "apps/cognito-custom-message-trigger/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/cognito-custom-message-trigger/tsconfig.app.json"
+      }
+    },
+    "dynamodb": {
+      "type": "library",
+      "root": "libs/dynamodb",
+      "entryFile": "index",
+      "sourceRoot": "libs/dynamodb/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/dynamodb/tsconfig.lib.json"
+      }
+    }
+  }
+}

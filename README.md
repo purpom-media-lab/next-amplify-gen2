@@ -1,61 +1,97 @@
-## 構成
+# 構成
 
-### app
+apps・packagesのモノレポ構成
 
-NextJS Approuter構成
+[参考](https://docs.amplify.aws/gen2/deploy-and-host/fullstack-branching/monorepos/)
 
-## Backend Code
+## apps
 
-### nest-app
+NextJS Approuterのソースコード
 
-**NestJSのコードをamplifyディレクトリ配下**におくと、ホットデプロイ時に以下のエラー発生したのでディレクトリ外に配置。そのため、このディレクトリ配下のコードの変更によってデプロイは走らないので注意。
+## packages
 
-```shell
-npx amplify sandbox
-amplify/custom/functions/test/src/app.controller.ts(4,2): error TS1238: Unable to resolve signature of class decorator when called as an expression.
-  The runtime will invoke the decorator with 2 arguments, but the decorator expects 1.
-amplify/custom/functions/test/src/app.controller.ts(8,3): error TS1241: Unable to resolve signature of method decorator when called as an expression.
-  The runtime will invoke the decorator with 2 arguments, but the decorator expects 3.
-amplify/custom/functions/test/src/app.controller.ts(8,4): error TS1270: Decorator function return type 'void | TypedPropertyDescriptor<unknown>' is not assignable to type 'void | (() => string)'.
-  Type 'TypedPropertyDescriptor<unknown>' is not assignable to type 'void | (() => string)'.
-amplify/custom/functions/test/src/app.module.ts(5,2): error TS1238: Unable to resolve signature of class decorator when called as an expression.
-  The runtime will invoke the decorator with 2 arguments, but the decorator expects 1.
-amplify/custom/functions/test/src/app.service.ts(3,2): error TS1238: Unable to resolve signature of class decorator when called as an expression.
-  The runtime will invoke the decorator with 2 arguments, but the decorator expects 1.
-TypeScript validation check failed, check your backend definition
+### shared-backend
 
 ```
+├── amplify
+│   │ 
+│   ├── custom
+│   │   └── function
+│  	│  	 └──  resources ← Lambdaのリソース定義はここに書く
+│   ├── auth ...
+│   │
+│   ├── data ...
+│   │
+│   ├── function-sources <-- NestJSのコードはここに書く
+│   │   ├── apps ...
+│   │   ├── libs ...
+│   │   └── package.json
+│   │
+│   ├── backend.ts
+│   ├── package.json
+│   ├── src/
+│   ├── tsconfig.json
+│   └── yarn.lock
+│ 
+├── package.json
+└── yarn.lock
+```
 
-### amplify
 
 `amplify/custom/functions/resouces.ts`内で以下のように定義
 
 ```typescript
-import * as lambda from "aws-cdk-lib/aws-lambda";
-import {Construct} from "constructs";
-import {Platform} from "aws-cdk-lib/aws-ecr-assets";
-import {Duration} from "aws-cdk-lib";
 import * as path from "path";
-import {fileURLToPath} from "url";
+import { fileURLToPath } from "url";
+import { Construct } from "constructs";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as kms from "aws-cdk-lib/aws-kms";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import { CfnUserPool } from "aws-cdk-lib/aws-cognito";
 
-export class CustomFunction extends Construct {
-    constructor(scope: Construct, id: string) {
-        super(scope, id);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-        const __filename = fileURLToPath(import.meta.url);
-        const __dirname = path.dirname(__filename);
+export class CustomFunctions extends Construct {
+  constructor(scope: Construct, id: string, userPool: CfnUserPool) {
+    super(scope, id);
 
-        const handler = new lambda.DockerImageFunction(this, "Handler", {
-            code: lambda.DockerImageCode.fromImageAsset(
-                path.join(__dirname, "../../../nest-app"),
-                {
-                    file: "Dockerfile",
-                    platform: Platform.LINUX_AMD64,
-                }
-            ),
-            timeout: Duration.seconds(30),
-        });
-    }
+    const cognitoCustomMessageTrigger = new lambda.DockerImageFunction(
+      this,
+      "CustomMessageTrigger",
+      {
+        code: lambda.DockerImageCode.fromImageAsset(
+          path.join(__dirname, "../../function-sources"),
+          {
+            file: "CognitoCustomMessageTrigger.Dockerfile",
+            platform: Platform.LINUX_AMD64,
+          }
+        ),
+        timeout: Duration.seconds(30),
+        memorySize: 512,
+      }
+    );
+
+    cognitoCustomMessageTrigger.grantInvoke(
+      new iam.ServicePrincipal("cognito-idp.amazonaws.com")
+    );
+
+    const kmsKey = new kms.Key(this, "AuthKmsKey", {
+      description: "Required by Cognito",
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+
+    // Lambda Triggerの設定
+    userPool.lambdaConfig = {
+      customEmailSender: {
+        lambdaArn: cognitoCustomMessageTrigger.functionArn,
+        lambdaVersion: "V1_0",
+      },
+      kmsKeyId: kmsKey.keyArn,
+    };
+  }
 }
 
 

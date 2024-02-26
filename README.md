@@ -1,4 +1,4 @@
-# 構成
+# next-amplify-gen2
 
 apps・packagesのモノレポ構成
 
